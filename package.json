@@ -2,18 +2,30 @@
   "name": "electron-project",
   "version": "1.0.0",
   "description": "",
-  "main": "dist/main.js",
+  "main": "out/main/main.js",
   "scripts": {
-    "build": "tsc",
-    "start": "npm run build && electron ."
+    "dev": "electron-vite dev",
+    "build": "tsc -b && electron-vite build",
+    "start": "electron-vite preview"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^26.2.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^5.2.0",
     "electron": "^43.3.0",
-    "typescript": "^7.0.2"
+    "electron-vite": "^5.0.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^7.3.6"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   }
 }
