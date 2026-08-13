@@ -115,6 +115,17 @@ src/renderer/            React UI
    ANTHROPIC_API_KEY=sk-ant-...
    ```
 
+   Optionally, add LangSmith tracing for the LangGraph agent mode (get a key
+   from [smith.langchain.com](https://smith.langchain.com/) → Settings → API
+   Keys). This auto-instruments every LLM and tool call — no code changes —
+   and is visible under the `mustipix` project on your LangSmith dashboard:
+
+   ```
+   LANGSMITH_TRACING=true
+   LANGSMITH_API_KEY=lsv2_...
+   LANGSMITH_PROJECT=mustipix
+   ```
+
 5. **Build the MCP server** (the Electron app spawns the compiled output,
    not the TypeScript source):
 
@@ -134,6 +145,18 @@ Before wiring it into Electron, the server can be driven directly with the
 
 ```
 cd mcp-server && npx @modelcontextprotocol/inspector node dist/index.js
+```
+
+## Evaluating agent behavior
+
+`eval/` is a standalone harness that runs a set of representative queries
+against the real MCP server and asserts the model picked the right tool
+with roughly the right arguments — including a regression guard for a bug
+where an exploratory tool call's results used to leak into the final
+answer's photos. See `eval/README.md` for why it's a separate package.
+
+```
+cd eval && npm install && npm run eval
 ```
 
 ## Tech stack

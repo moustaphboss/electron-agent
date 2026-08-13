@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { McpConnection } from "../../preload/index";
+import type { McpConnection, UIBlock } from "../../preload/index";
 import iconUrl from "./assets/icon.png";
 
 type PingResult = {
@@ -12,11 +12,44 @@ type ChatMessage = {
   role: "user" | "assistant";
   content: string;
   images?: string[];
+  ui?: UIBlock[];
 };
 type ChatSession = { id: string; title: string; messages: ChatMessage[] };
 
 function photoUrl(filePath: string): string {
   return `photo-file://local/${encodeURIComponent(filePath)}`;
+}
+
+function UITableBlock({ block }: { block: Extract<UIBlock, { type: "table" }> }) {
+  return (
+    <div className="mt-2 max-w-[85%] overflow-x-auto rounded-lg bg-slate-800 p-2">
+      {block.title && (
+        <p className="mb-1 text-xs font-semibold text-white">{block.title}</p>
+      )}
+      <table className="w-full text-left text-xs text-white">
+        <thead>
+          <tr>
+            {block.columns.map((c) => (
+              <th key={c.key} className="px-2 py-1 text-slate-400">
+                {c.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {block.rows.map((row, i) => (
+            <tr key={i} className="border-t border-slate-700">
+              {block.columns.map((c) => (
+                <td key={c.key} className="px-2 py-1">
+                  {row[c.key] ?? "—"}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 function App() {
@@ -30,10 +63,12 @@ function App() {
   const [pastChats, setPastChats] = useState<ChatSession[]>([]);
   const [viewingChatId, setViewingChatId] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
   const [agentMode, setAgentMode] = useState<"hand-rolled" | "langgraph">(
     "hand-rolled",
   );
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const activeRequestId = useRef<string | null>(null);
 
   const [showExtensions, setShowExtensions] = useState(false);
   const [mcpConnections, setMcpConnections] = useState<McpConnection[]>([]);
@@ -65,7 +100,7 @@ function App() {
     }
   }
 
-  async function runAskAgent() {
+  function runAskAgent() {
     if (!agentMessage.trim() || isReadOnly) return;
     const userText = agentMessage;
     setCurrentMessages((prev) => [
@@ -73,16 +108,11 @@ function App() {
       { role: "user", content: userText },
     ]);
     setAgentMessage("");
+    setStreamingText("");
     setAsking(true);
-    try {
-      const reply = await window.demoAPI.askAgent(userText, agentMode);
-      setCurrentMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: reply.text, images: reply.images },
-      ]);
-    } finally {
-      setAsking(false);
-    }
+    const requestId = crypto.randomUUID();
+    activeRequestId.current = requestId;
+    window.demoAPI.askAgentStream(requestId, userText, agentMode);
   }
 
   function startNewChat() {
@@ -117,8 +147,44 @@ function App() {
   }, []);
 
   useEffect(() => {
+    window.demoAPI.onAgentChunk((requestId, delta) => {
+      if (requestId !== activeRequestId.current) return;
+      setStreamingText((prev) => prev + delta);
+    });
+    window.demoAPI.onAgentReset((requestId) => {
+      if (requestId !== activeRequestId.current) return;
+      setStreamingText("");
+    });
+    window.demoAPI.onAgentDone((requestId, reply) => {
+      if (requestId !== activeRequestId.current) return;
+      activeRequestId.current = null;
+      setCurrentMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: reply.text,
+          images: reply.images,
+          ui: reply.ui,
+        },
+      ]);
+      setStreamingText("");
+      setAsking(false);
+    });
+    window.demoAPI.onAgentError((requestId, message) => {
+      if (requestId !== activeRequestId.current) return;
+      activeRequestId.current = null;
+      setCurrentMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: message },
+      ]);
+      setStreamingText("");
+      setAsking(false);
+    });
+  }, []);
+
+  useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [displayedMessages, asking]);
+  }, [displayedMessages, asking, streamingText]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -286,7 +352,7 @@ function App() {
                   className={`max-w-[85%] whitespace-pre-wrap rounded-lg px-3 py-2 text-xs ${
                     m.role === "user"
                       ? "bg-indigo-600 text-white"
-                      : "bg-slate-800 text-emerald-400"
+                      : "bg-slate-800 text-white"
                   }`}
                 >
                   {m.content}
@@ -304,12 +370,19 @@ function App() {
                     ))}
                   </div>
                 )}
+                {m.ui?.map((block, bi) => (
+                  <UITableBlock key={bi} block={block} />
+                ))}
               </div>
             ))}
             {asking && !isReadOnly && (
               <div className="flex justify-start">
-                <p className="rounded-lg bg-slate-800 px-3 py-2 text-xs text-slate-400">
-                  Thinking…
+                <p
+                  className={`max-w-[85%] whitespace-pre-wrap rounded-lg bg-slate-800 px-3 py-2 text-xs ${
+                    streamingText ? "text-white" : "text-slate-400"
+                  }`}
+                >
+                  {streamingText || "Thinking…"}
                 </p>
               </div>
             )}

@@ -98,38 +98,44 @@ ipcMain.handle("list-mcp-connections", async () => {
   ];
 });
 
-ipcMain.handle(
-  "ask-agent",
-  async (_event, message: string, mode: AgentMode = "hand-rolled") => {
+ipcMain.on(
+  "ask-agent-stream",
+  async (
+    event,
+    requestId: string,
+    message: string,
+    mode: AgentMode = "hand-rolled",
+  ) => {
+    const sender = event.sender;
     if (!mcpClient) {
-      throw new Error("MCP client is not connected yet.");
+      sender.send("agent-error", requestId, "MCP client is not connected yet.");
+      return;
     }
     try {
-      return mode === "langgraph"
-        ? await runLangGraphAgentLoop(message, mcpClient)
-        : await runAgentLoop(message, mcpClient, anthropic);
+      const reply =
+        mode === "langgraph"
+          ? await runLangGraphAgentLoop(message, mcpClient, (delta) =>
+              sender.send("agent-chunk", requestId, delta),
+            )
+          : await runAgentLoop(message, mcpClient, anthropic, {
+              onDelta: (delta) => sender.send("agent-chunk", requestId, delta),
+              onTurnDiscarded: () => sender.send("agent-reset", requestId),
+            });
+      sender.send("agent-done", requestId, reply);
     } catch (err) {
       console.error("[agent] failed:", err);
+      let text = "Something went wrong answering that — please try again.";
       if (
         err instanceof Anthropic.APIError &&
         err.status &&
         err.status >= 500
       ) {
-        return {
-          text: "The AI service is temporarily overloaded. Please try asking again in a moment.",
-          images: [],
-        };
+        text =
+          "The AI service is temporarily overloaded. Please try asking again in a moment.";
+      } else if (err instanceof Anthropic.APIError && err.status === 429) {
+        text = "Rate limit reached. Please wait a moment before asking again.";
       }
-      if (err instanceof Anthropic.APIError && err.status === 429) {
-        return {
-          text: "Rate limit reached. Please wait a moment before asking again.",
-          images: [],
-        };
-      }
-      return {
-        text: "Something went wrong answering that — please try again.",
-        images: [],
-      };
+      sender.send("agent-error", requestId, text);
     }
   },
 );

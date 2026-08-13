@@ -1,0 +1,21 @@
+{
+  "name": "eval",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Evaluation harness for the agent's tool-selection behavior, run against the real compiled MCP server.",
+  "main": "dist/run.js",
+  "scripts": {
+    "build": "tsc -b",
+    "eval": "tsc -b && node dist/run.js"
+  },
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.116.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "dotenv": "^17.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "typescript": "^7.0.2"
+  }
+}

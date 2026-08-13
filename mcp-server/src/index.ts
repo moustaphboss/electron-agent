@@ -147,7 +147,15 @@ server.registerTool(
       .all({
         ...params,
         limit: input.limit,
-      });
+      }) as Record<string, unknown>[];
+
+    // file_path is deliberately withheld here — a broad search shouldn't
+    // hand back displayable images for free. To actually show a specific
+    // photo, the model must call get_photo_details(id) for it, which does
+    // return file_path. This keeps "what gets displayed" tied one-to-one
+    // to an explicit per-photo lookup instead of whatever a search returned.
+    const photosForModel = rows.map(({ file_path, ...rest }) => rest);
+
     return {
       content: [
         {
@@ -155,9 +163,9 @@ server.registerTool(
           text: JSON.stringify(
             {
               totalMatches,
-              returned: rows.length,
-              truncated: totalMatches > rows.length,
-              photos: rows,
+              returned: photosForModel.length,
+              truncated: totalMatches > photosForModel.length,
+              photos: photosForModel,
             },
             null,
             2,

@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
+import type { UIBlock } from "../main/uiBlocks";
 
 contextBridge.exposeInMainWorld("demoAPI", {
   ping: () => ipcRenderer.invoke("ping"),
@@ -6,7 +7,33 @@ contextBridge.exposeInMainWorld("demoAPI", {
   onMenuPing: (callback: () => void) => {
     ipcRenderer.on("menu-ping", callback);
   },
-  askAgent: (message: string, mode: "hand-rolled" | "langgraph") =>
-    ipcRenderer.invoke("ask-agent", message, mode),
+  askAgentStream: (
+    requestId: string,
+    message: string,
+    mode: "hand-rolled" | "langgraph",
+  ) => ipcRenderer.send("ask-agent-stream", requestId, message, mode),
+  onAgentChunk: (callback: (requestId: string, delta: string) => void) => {
+    ipcRenderer.on("agent-chunk", (_e, requestId, delta) =>
+      callback(requestId, delta),
+    );
+  },
+  onAgentReset: (callback: (requestId: string) => void) => {
+    ipcRenderer.on("agent-reset", (_e, requestId) => callback(requestId));
+  },
+  onAgentDone: (
+    callback: (
+      requestId: string,
+      reply: { text: string; images: string[]; ui: UIBlock[] },
+    ) => void,
+  ) => {
+    ipcRenderer.on("agent-done", (_e, requestId, reply) =>
+      callback(requestId, reply),
+    );
+  },
+  onAgentError: (callback: (requestId: string, message: string) => void) => {
+    ipcRenderer.on("agent-error", (_e, requestId, message) =>
+      callback(requestId, message),
+    );
+  },
   listMcpConnections: () => ipcRenderer.invoke("list-mcp-connections"),
 });
