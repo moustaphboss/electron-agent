@@ -11,7 +11,15 @@ contextBridge.exposeInMainWorld("demoAPI", {
     requestId: string,
     message: string,
     mode: "hand-rolled" | "langgraph",
-  ) => ipcRenderer.send("ask-agent-stream", requestId, message, mode),
+    a2uiEnabled: boolean,
+  ) =>
+    ipcRenderer.send(
+      "ask-agent-stream",
+      requestId,
+      message,
+      mode,
+      a2uiEnabled,
+    ),
   onAgentChunk: (callback: (requestId: string, delta: string) => void) => {
     ipcRenderer.on("agent-chunk", (_e, requestId, delta) =>
       callback(requestId, delta),

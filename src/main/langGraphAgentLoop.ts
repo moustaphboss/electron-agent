@@ -13,7 +13,7 @@ import {
   UIBlock,
   validateTableBlock,
 } from "./uiBlocks";
-import { SYSTEM_PROMPT } from "./systemPrompt";
+import { buildSystemPrompt } from "./systemPrompt";
 
 const MODEL = "claude-sonnet-5";
 
@@ -38,6 +38,7 @@ export async function runLangGraphAgentLoop(
   userMessage: string,
   mcpClient: Client,
   onDelta: (text: string) => void,
+  a2uiEnabled: boolean,
 ): Promise<AgentReply> {
   const tools = await loadMcpTools("mcp-server", mcpClient);
 
@@ -65,8 +66,8 @@ export async function runLangGraphAgentLoop(
 
   const agent = createReactAgent({
     llm,
-    tools: [...tools, renderTableTool],
-    prompt: SYSTEM_PROMPT,
+    tools: a2uiEnabled ? [...tools, renderTableTool] : tools,
+    prompt: buildSystemPrompt(a2uiEnabled),
   });
 
   const stream = await agent.stream(

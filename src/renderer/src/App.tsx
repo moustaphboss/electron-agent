@@ -67,6 +67,7 @@ function App() {
   const [agentMode, setAgentMode] = useState<"hand-rolled" | "langgraph">(
     "hand-rolled",
   );
+  const [a2uiEnabled, setA2uiEnabled] = useState(true);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const activeRequestId = useRef<string | null>(null);
 
@@ -112,7 +113,7 @@ function App() {
     setAsking(true);
     const requestId = crypto.randomUUID();
     activeRequestId.current = requestId;
-    window.demoAPI.askAgentStream(requestId, userText, agentMode);
+    window.demoAPI.askAgentStream(requestId, userText, agentMode, a2uiEnabled);
   }
 
   function startNewChat() {
@@ -325,6 +326,29 @@ function App() {
                 LangGraph
               </button>
             </div>
+          </div>
+
+          <div className="mt-2 flex items-center justify-between">
+            <span className="text-xs text-slate-400">
+              A2UI (agent-driven table rendering)
+            </span>
+            <button
+              id="a2ui-toggle-btn"
+              type="button"
+              role="switch"
+              aria-checked={a2uiEnabled}
+              onClick={() => setA2uiEnabled((v) => !v)}
+              className={`inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
+                a2uiEnabled ? "bg-indigo-600" : "bg-slate-700"
+              }`}
+            >
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                  a2uiEnabled ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </button>
           </div>
 
           {isReadOnly && (

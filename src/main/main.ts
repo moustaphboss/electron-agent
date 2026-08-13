@@ -105,6 +105,7 @@ ipcMain.on(
     requestId: string,
     message: string,
     mode: AgentMode = "hand-rolled",
+    a2uiEnabled = true,
   ) => {
     const sender = event.sender;
     if (!mcpClient) {
@@ -114,13 +115,22 @@ ipcMain.on(
     try {
       const reply =
         mode === "langgraph"
-          ? await runLangGraphAgentLoop(message, mcpClient, (delta) =>
-              sender.send("agent-chunk", requestId, delta),
+          ? await runLangGraphAgentLoop(
+              message,
+              mcpClient,
+              (delta) => sender.send("agent-chunk", requestId, delta),
+              a2uiEnabled,
             )
-          : await runAgentLoop(message, mcpClient, anthropic, {
-              onDelta: (delta) => sender.send("agent-chunk", requestId, delta),
-              onTurnDiscarded: () => sender.send("agent-reset", requestId),
-            });
+          : await runAgentLoop(
+              message,
+              mcpClient,
+              anthropic,
+              {
+                onDelta: (delta) => sender.send("agent-chunk", requestId, delta),
+                onTurnDiscarded: () => sender.send("agent-reset", requestId),
+              },
+              a2uiEnabled,
+            );
       sender.send("agent-done", requestId, reply);
     } catch (err) {
       console.error("[agent] failed:", err);

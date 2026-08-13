@@ -33,6 +33,7 @@ export interface DemoAPI {
     requestId: string,
     message: string,
     mode: "hand-rolled" | "langgraph",
+    a2uiEnabled: boolean,
   ) => void;
   onAgentChunk: (callback: (requestId: string, delta: string) => void) => void;
   onAgentReset: (callback: (requestId: string) => void) => void;

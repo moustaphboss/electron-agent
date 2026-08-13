@@ -9,7 +9,7 @@ import {
   UIBlock,
   validateTableBlock,
 } from "./uiBlocks";
-import { SYSTEM_PROMPT } from "./systemPrompt";
+import { buildSystemPrompt } from "./systemPrompt";
 
 const MODEL = "claude-sonnet-5";
 const MAX_TURNS = 5;
@@ -36,6 +36,7 @@ export async function runAgentLoop(
   mcpClient: Client,
   anthropic: Anthropic,
   handlers: AgentStreamHandlers,
+  a2uiEnabled: boolean,
 ): Promise<AgentReply> {
   const traceId = randomUUID();
   console.log(`[agent] turn start, traceId=${traceId}`);
@@ -48,14 +49,16 @@ export async function runAgentLoop(
     description: t.description,
     input_schema: t.inputSchema as Anthropic.Tool.InputSchema,
   }));
-  const allTools = [
-    ...anthropicTools,
-    {
-      name: RENDER_TABLE_TOOL_NAME,
-      description: RENDER_TABLE_TOOL_DESCRIPTION,
-      input_schema: RENDER_TABLE_JSON_SCHEMA as unknown as Anthropic.Tool.InputSchema,
-    },
-  ];
+  const allTools = a2uiEnabled
+    ? [
+        ...anthropicTools,
+        {
+          name: RENDER_TABLE_TOOL_NAME,
+          description: RENDER_TABLE_TOOL_DESCRIPTION,
+          input_schema: RENDER_TABLE_JSON_SCHEMA as unknown as Anthropic.Tool.InputSchema,
+        },
+      ]
+    : anthropicTools;
 
   const messages: Anthropic.MessageParam[] = [
     { role: "user", content: userMessage },
@@ -65,7 +68,7 @@ export async function runAgentLoop(
     const stream = anthropic.messages.stream({
       model: MODEL,
       max_tokens: 1024,
-      system: SYSTEM_PROMPT,
+      system: buildSystemPrompt(a2uiEnabled),
       messages,
       tools: allTools,
     });
