@@ -6,4 +6,5 @@ contextBridge.exposeInMainWorld("demoAPI", {
   onMenuPing: (callback: () => void) => {
     ipcRenderer.on("menu-ping", callback);
   },
+  askAgent: (message: string) => ipcRenderer.invoke("ask-agent", message),
 });

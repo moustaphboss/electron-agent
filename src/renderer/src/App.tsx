@@ -12,6 +12,9 @@ function App() {
   const [pinging, setPinging] = useState(false);
   const [saveResult, setSaveResult] = useState<SaveResult | null>(null);
   const [saving, setSaving] = useState(false);
+  const [agentMessage, setAgentMessage] = useState("");
+  const [agentReply, setAgentReply] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
 
   async function runPing(source: "button" | "menu") {
     setPinging(true);
@@ -30,6 +33,17 @@ function App() {
       setSaveResult(result);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function runAskAgent() {
+    if (!agentMessage.trim()) return;
+    setAsking(true);
+    try {
+      const reply = await window.demoAPI.askAgent(agentMessage);
+      setAgentReply(reply);
+    } finally {
+      setAsking(false);
     }
   }
 
@@ -75,6 +89,37 @@ function App() {
               (saveResult.canceled
                 ? "Save dialog canceled"
                 : `Saved to: ${saveResult.filePath}`)}
+          </p>
+        </div>
+
+        <div className="mt-8 border-t border-slate-800 pt-6">
+          <h2 className="text-sm font-semibold text-slate-200">
+            Ask Agent (photo library)
+          </h2>
+          <div className="mt-3 flex gap-2">
+            <input
+              id="agent-input"
+              type="text"
+              value={agentMessage}
+              onChange={(e) => setAgentMessage(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && runAskAgent()}
+              placeholder="e.g. find my Switzerland shots at f/8 or narrower"
+              className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+            />
+            <button
+              id="agent-ask-btn"
+              onClick={runAskAgent}
+              disabled={asking}
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {asking ? "Thinking…" : "Ask"}
+            </button>
+          </div>
+          <p
+            id="agent-result"
+            className="mt-3 whitespace-pre-wrap text-xs text-emerald-400"
+          >
+            {agentReply}
           </p>
         </div>
       </div>
