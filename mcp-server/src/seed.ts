@@ -18,13 +18,22 @@ async function findJpgs(root: string): Promise<string[]> {
     });
 }
 
-const KNOWN_CITIES = new Set(["Baden-Baden", "Frankfurt", "Heidelberg", "koln"]);
+const KNOWN_CITIES = new Set([
+  "Baden-Baden",
+  "Frankfurt",
+  "Heidelberg",
+  "koln",
+]);
 
-function parseCountryAndCity(filePath: string, root: string): { country: string; city: string | null } {
+function parseCountryAndCity(
+  filePath: string,
+  root: string,
+): { country: string; city: string | null } {
   const relative = path.relative(root, filePath);
   const segments = relative.split(path.sep);
   const country = segments[0];
-  const city = segments.length > 2 && KNOWN_CITIES.has(segments[1]) ? segments[1] : null;
+  const city =
+    segments.length > 2 && KNOWN_CITIES.has(segments[1]) ? segments[1] : null;
   return { country, city };
 }
 
@@ -52,11 +61,13 @@ const insertPhoto = db.prepare(`
   )
 `);
 
-const insertMany = db.transaction((rows: Awaited<ReturnType<typeof extractPhotoData>>[]) => {
-  for (const row of rows) {
-    insertPhoto.run(row);
-  }
-});
+const insertMany = db.transaction(
+  (rows: Awaited<ReturnType<typeof extractPhotoData>>[]) => {
+    for (const row of rows) {
+      insertPhoto.run(row);
+    }
+  },
+);
 
 async function main() {
   const files = await findJpgs(PHOTOS_ROOT);

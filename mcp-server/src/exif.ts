@@ -14,7 +14,16 @@ export interface ExifData {
 
 export async function extractExif(filePath: string): Promise<ExifData> {
   const exif = await parseExif(filePath, {
-    pick: ["Make", "Model", "LensModel", "FNumber", "ExposureTime", "ISO", "FocalLength", "DateTimeOriginal"],
+    pick: [
+      "Make",
+      "Model",
+      "LensModel",
+      "FNumber",
+      "ExposureTime",
+      "ISO",
+      "FocalLength",
+      "DateTimeOriginal",
+    ],
   });
   return {
     camera_make: exif?.Make ?? null,
@@ -24,6 +33,8 @@ export async function extractExif(filePath: string): Promise<ExifData> {
     shutter_speed: exif?.ExposureTime ?? null,
     iso: exif?.ISO ?? null,
     focal_length: exif?.FocalLength ?? null,
-    captured_at: exif?.DateTimeOriginal ? exif.DateTimeOriginal.toISOString() : null,
+    captured_at: exif?.DateTimeOriginal
+      ? exif.DateTimeOriginal.toISOString()
+      : null,
   };
 }

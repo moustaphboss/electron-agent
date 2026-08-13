@@ -12,7 +12,16 @@ const server = new McpServer({
 });
 
 const searchPhotosInput = {
-  country: z.enum(["Germany", "Switzerland", "Sweden", "Vietnam", "Austria", "Slovenia"]).optional(),
+  country: z
+    .enum([
+      "Germany",
+      "Switzerland",
+      "Sweden",
+      "Vietnam",
+      "Austria",
+      "Slovenia",
+    ])
+    .optional(),
   city: z.string().optional(),
   exposure: z
     .object({
@@ -31,7 +40,9 @@ const searchPhotosInput = {
   limit: z.number().int().positive().max(100).default(20),
 };
 
-type SearchPhotosInput = z.infer<ReturnType<typeof z.object<typeof searchPhotosInput>>>;
+type SearchPhotosInput = z.infer<
+  ReturnType<typeof z.object<typeof searchPhotosInput>>
+>;
 
 function buildSearchQuery(input: SearchPhotosInput) {
   const conditions: string[] = [];
@@ -70,7 +81,8 @@ function buildSearchQuery(input: SearchPhotosInput) {
     params.to = input.dateRange.to;
   }
 
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where =
+    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
   return { where, params };
 }
@@ -79,25 +91,43 @@ server.registerTool(
   "search_photos",
   {
     title: "Search Photos",
-    description: "Search the photo library by country, city, exposure settings (aperture/ISO range), or date range.",
+    description:
+      "Search the photo library by country, city, exposure settings (aperture/ISO range), or date range.",
     inputSchema: searchPhotosInput,
   },
   async (input) => {
     const { where, params } = buildSearchQuery(input);
-    const totalMatches = (db.prepare(`SELECT COUNT(*) as n FROM photos ${where}`).get(params) as { n: number }).n;
-    const rows = db.prepare(`SELECT * FROM photos ${where} ORDER BY captured_at DESC LIMIT @limit`).all({
-      ...params,
-      limit: input.limit,
-    });
+    const totalMatches = (
+      db.prepare(`SELECT COUNT(*) as n FROM photos ${where}`).get(params) as {
+        n: number;
+      }
+    ).n;
+    const rows = db
+      .prepare(
+        `SELECT * FROM photos ${where} ORDER BY captured_at DESC LIMIT @limit`,
+      )
+      .all({
+        ...params,
+        limit: input.limit,
+      });
     return {
       content: [
         {
           type: "text",
-          text: JSON.stringify({ totalMatches, returned: rows.length, truncated: totalMatches > rows.length, photos: rows }, null, 2),
+          text: JSON.stringify(
+            {
+              totalMatches,
+              returned: rows.length,
+              truncated: totalMatches > rows.length,
+              photos: rows,
+            },
+            null,
+            2,
+          ),
         },
       ],
     };
-  }
+  },
 );
 
 const getPhotoDetailsInput = {
@@ -121,7 +151,7 @@ server.registerTool(
     return {
       content: [{ type: "text", text: JSON.stringify(photo, null, 2) }],
     };
-  }
+  },
 );
 
 const suggestPhotoLocationsInput = {
@@ -140,24 +170,50 @@ server.registerTool(
     const cityRanges = db
       .prepare(
         `SELECT country, city, MIN(captured_at) as start, MAX(captured_at) as end
-         FROM photos WHERE city IS NOT NULL GROUP BY country, city`
+         FROM photos WHERE city IS NOT NULL GROUP BY country, city`,
       )
       .all() as { country: string; city: string; start: string; end: string }[];
     const countryRanges = db
-      .prepare(`SELECT country, MIN(captured_at) as start, MAX(captured_at) as end FROM photos GROUP BY country`)
+      .prepare(
+        `SELECT country, MIN(captured_at) as start, MAX(captured_at) as end FROM photos GROUP BY country`,
+      )
       .all() as { country: string; start: string; end: string }[];
 
-    const entries = await readdir(folderPath, { withFileTypes: true });
-    const jpgs = entries.filter((e) => e.isFile() && e.name.toLowerCase().endsWith(".jpg"));
+    let entries;
+    try {
+      entries = await readdir(folderPath, { withFileTypes: true });
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      const message =
+        code === "ENOENT"
+          ? `Folder not found: ${folderPath}`
+          : code === "ENOTDIR"
+            ? `Not a folder: ${folderPath}`
+            : code === "EACCES"
+              ? `Permission denied reading folder: ${folderPath}`
+              : `Could not read folder: ${folderPath}`;
+      return { content: [{ type: "text", text: message }], isError: true };
+    }
+
+    const jpgs = entries.filter(
+      (e) => e.isFile() && e.name.toLowerCase().endsWith(".jpg"),
+    );
 
     const suggestions = [];
     for (const file of jpgs) {
       const exif = await extractExif(path.join(folderPath, file.name));
       if (!exif.captured_at) {
-        suggestions.push({ filename: file.name, suggestedCountry: null, suggestedCity: null, reason: "No capture date in EXIF." });
+        suggestions.push({
+          filename: file.name,
+          suggestedCountry: null,
+          suggestedCity: null,
+          reason: "No capture date in EXIF.",
+        });
         continue;
       }
-      const cityMatch = cityRanges.find((r) => exif.captured_at! >= r.start && exif.captured_at! <= r.end);
+      const cityMatch = cityRanges.find(
+        (r) => exif.captured_at! >= r.start && exif.captured_at! <= r.end,
+      );
       if (cityMatch) {
         suggestions.push({
           filename: file.name,
@@ -167,7 +223,9 @@ server.registerTool(
         });
         continue;
       }
-      const countryMatch = countryRanges.find((r) => exif.captured_at! >= r.start && exif.captured_at! <= r.end);
+      const countryMatch = countryRanges.find(
+        (r) => exif.captured_at! >= r.start && exif.captured_at! <= r.end,
+      );
       suggestions.push(
         countryMatch
           ? {
@@ -176,17 +234,21 @@ server.registerTool(
               suggestedCity: null,
               reason: `Captured ${exif.captured_at}, within your ${countryMatch.country} trip.`,
             }
-          : { filename: file.name, suggestedCountry: null, suggestedCity: null, reason: "Doesn't match any known trip." }
+          : {
+              filename: file.name,
+              suggestedCountry: null,
+              suggestedCity: null,
+              reason: "Doesn't match any known trip.",
+            },
       );
     }
 
-    return { content: [{ type: "text", text: JSON.stringify(suggestions, null, 2) }] };
-  }
+    return {
+      content: [{ type: "text", text: JSON.stringify(suggestions, null, 2) }],
+    };
+  },
 );
-
 
 const transport = new StdioServerTransport();
 
 await server.connect(transport);
-
-
