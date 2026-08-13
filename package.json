@@ -1,5 +1,6 @@
 {
   "name": "electron-project",
+  "productName": "Mustipix",
   "version": "1.0.0",
   "description": "",
   "main": "out/main/main.js",

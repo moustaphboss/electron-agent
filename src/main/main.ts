@@ -8,6 +8,11 @@ import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { connectMcpClient } from "./mcpClient";
 import { runAgentLoop } from "./agentLoop";
 
+const APP_NAME = "Mustipix";
+const iconPath = path.join(__dirname, "../../resources/icon.png");
+
+app.setName(APP_NAME);
+
 let mainWindow: BrowserWindow | null = null;
 let mcpClient: Client | null = null;
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -16,6 +21,8 @@ function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
+    title: APP_NAME,
+    icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, "../preload/preload.js"),
       contextIsolation: true,
@@ -79,6 +86,10 @@ ipcMain.handle("ask-agent", async (_event, message: string) => {
 });
 
 app.whenReady().then(async () => {
+  if (process.platform === "darwin") {
+    app.dock?.setIcon(iconPath);
+  }
+
   createWindow();
 
   mcpClient = await connectMcpClient();

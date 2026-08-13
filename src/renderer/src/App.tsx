@@ -54,7 +54,7 @@ function App() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 p-8 text-slate-100">
       <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-8 shadow-2xl">
-        <h1 className="text-2xl font-semibold tracking-tight">Electron Demo</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Mustipix</h1>
         <p className="mt-1 text-sm text-slate-400">
           Renderer <span className="text-slate-500">↔</span> Main process, over
           IPC.
