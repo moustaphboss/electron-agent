@@ -1,17 +1,24 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { randomUUID } from "crypto";
+import { extractImagePaths } from "./extractImages";
 
 const MODEL = "claude-sonnet-5";
 const MAX_TURNS = 5;
+
+export interface AgentReply {
+  text: string;
+  images: string[];
+}
 
 export async function runAgentLoop(
   userMessage: string,
   mcpClient: Client,
   anthropic: Anthropic,
-): Promise<string> {
+): Promise<AgentReply> {
   const traceId = randomUUID();
   console.log(`[agent] turn start, traceId=${traceId}`);
+  const images: string[] = [];
 
   const { tools } = await mcpClient.listTools();
   const anthropicTools = tools.map((t) => ({
@@ -42,7 +49,10 @@ export async function runAgentLoop(
     const toolUseBlocks = response.content.filter((b) => b.type === "tool_use");
 
     if (toolUseBlocks.length === 0) {
-      return reasoning && "text" in reasoning ? reasoning.text : "";
+      return {
+        text: reasoning && "text" in reasoning ? reasoning.text : "",
+        images,
+      };
     }
 
     const toolResults: Anthropic.ToolResultBlockParam[] = [];
@@ -56,6 +66,18 @@ export async function runAgentLoop(
         arguments: block.input as Record<string, unknown>,
         _meta: { traceId } as Record<string, unknown>,
       });
+      const textBlock = Array.isArray(result.content)
+        ? result.content.find(
+            (b): b is { type: "text"; text: string } =>
+              typeof b === "object" &&
+              b !== null &&
+              "type" in b &&
+              b.type === "text",
+          )
+        : undefined;
+      if (textBlock) {
+        images.push(...extractImagePaths(block.name, textBlock.text));
+      }
       toolResults.push({
         type: "tool_result",
         tool_use_id: block.id,
@@ -67,5 +89,8 @@ export async function runAgentLoop(
     messages.push({ role: "user", content: toolResults });
   }
 
-  return "I wasn't able to finish this after several attempts — could you rephrase or narrow the request?";
+  return {
+    text: "I wasn't able to finish this after several attempts — could you rephrase or narrow the request?",
+    images,
+  };
 }

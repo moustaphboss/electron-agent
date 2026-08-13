@@ -4,6 +4,9 @@
   "description": "",
   "main": "dist/index.js",
   "scripts": {
+    "build": "tsc -b",
+    "seed": "tsc -b && node dist/seed.js",
+    "start": "node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

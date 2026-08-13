@@ -6,5 +6,7 @@ contextBridge.exposeInMainWorld("demoAPI", {
   onMenuPing: (callback: () => void) => {
     ipcRenderer.on("menu-ping", callback);
   },
-  askAgent: (message: string) => ipcRenderer.invoke("ask-agent", message),
+  askAgent: (message: string, mode: "hand-rolled" | "langgraph") =>
+    ipcRenderer.invoke("ask-agent", message, mode),
+  listMcpConnections: () => ipcRenderer.invoke("list-mcp-connections"),
 });

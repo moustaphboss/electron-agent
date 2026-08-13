@@ -1,17 +1,35 @@
 import { config } from "dotenv";
 config();
 
-import { app, BrowserWindow, Menu, ipcMain, dialog } from "electron";
+import { app, BrowserWindow, Menu, ipcMain, dialog, protocol } from "electron";
 import * as path from "path";
+import { readFile } from "fs/promises";
 import Anthropic from "@anthropic-ai/sdk";
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { connectMcpClient } from "./mcpClient";
 import { runAgentLoop } from "./agentLoop";
+import { runLangGraphAgentLoop } from "./langGraphAgentLoop";
+
+export type AgentMode = "hand-rolled" | "langgraph";
 
 const APP_NAME = "Mustipix";
 const iconPath = path.join(__dirname, "../../resources/icon.png");
 
 app.setName(APP_NAME);
+
+// Lets the renderer safely display local photo files without disabling
+// Electron's webSecurity or exposing the filesystem directly.
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "photo-file",
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+    },
+  },
+]);
 
 let mainWindow: BrowserWindow | null = null;
 let mcpClient: Client | null = null;
@@ -19,8 +37,8 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 1200,
+    height: 750,
     title: APP_NAME,
     icon: iconPath,
     webPreferences: {
@@ -67,28 +85,72 @@ ipcMain.handle("show-save-dialog", async () => {
   return { canceled: result.canceled, filePath: result.filePath ?? null };
 });
 
-ipcMain.handle("ask-agent", async (_event, message: string) => {
+ipcMain.handle("list-mcp-connections", async () => {
   if (!mcpClient) {
-    throw new Error("MCP client is not connected yet.");
+    return [];
   }
-  try {
-    return await runAgentLoop(message, mcpClient, anthropic);
-  } catch (err) {
-    console.error("[agent] failed:", err);
-    if (err instanceof Anthropic.APIError && err.status && err.status >= 500) {
-      return "The AI service is temporarily overloaded. Please try asking again in a moment.";
-    }
-    if (err instanceof Anthropic.APIError && err.status === 429) {
-      return "Rate limit reached. Please wait a moment before asking again.";
-    }
-    return "Something went wrong answering that — please try again.";
-  }
+  const { tools } = await mcpClient.listTools();
+  return [
+    {
+      name: "mcp-server",
+      tools: tools.map((t) => ({ name: t.name, description: t.description })),
+    },
+  ];
 });
+
+ipcMain.handle(
+  "ask-agent",
+  async (_event, message: string, mode: AgentMode = "hand-rolled") => {
+    if (!mcpClient) {
+      throw new Error("MCP client is not connected yet.");
+    }
+    try {
+      return mode === "langgraph"
+        ? await runLangGraphAgentLoop(message, mcpClient)
+        : await runAgentLoop(message, mcpClient, anthropic);
+    } catch (err) {
+      console.error("[agent] failed:", err);
+      if (
+        err instanceof Anthropic.APIError &&
+        err.status &&
+        err.status >= 500
+      ) {
+        return {
+          text: "The AI service is temporarily overloaded. Please try asking again in a moment.",
+          images: [],
+        };
+      }
+      if (err instanceof Anthropic.APIError && err.status === 429) {
+        return {
+          text: "Rate limit reached. Please wait a moment before asking again.",
+          images: [],
+        };
+      }
+      return {
+        text: "Something went wrong answering that — please try again.",
+        images: [],
+      };
+    }
+  },
+);
 
 app.whenReady().then(async () => {
   if (process.platform === "darwin") {
     app.dock?.setIcon(iconPath);
   }
+
+  protocol.handle("photo-file", async (request) => {
+    const url = new URL(request.url);
+    const filePath = decodeURIComponent(url.pathname.slice(1));
+    try {
+      const data = await readFile(filePath);
+      const ext = path.extname(filePath).toLowerCase();
+      const contentType = ext === ".png" ? "image/png" : "image/jpeg";
+      return new Response(data, { headers: { "content-type": contentType } });
+    } catch {
+      return new Response(null, { status: 404 });
+    }
+  });
 
   createWindow();
 
