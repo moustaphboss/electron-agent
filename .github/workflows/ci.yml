@@ -19,3 +19,33 @@ jobs:
 
       - run: npm ci
       - run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - run: npm ci
+      - run: npm run build
+
+      - run: npm ci
+        working-directory: mcp-server
+      - run: npm run seed:ci
+        working-directory: mcp-server
+
+      # Electron needs an actual display server to open a window, and these
+      # runtime libs, even to run "headless" in CI — neither ships on a bare
+      # ubuntu-latest runner.
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libnss3 libgbm1 libasound2t64 \
+            libgtk-3-0 libxss1 libxkbcommon0 libatk-bridge2.0-0 libcups2 libdrm2
+
+      - run: xvfb-run -a npx playwright test
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
