@@ -1,5 +1,6 @@
 import { app, BrowserWindow, Menu, ipcMain, dialog } from "electron";
 import * as path from "path";
+import { connectMcpClient } from "./mcpClient";
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -51,7 +52,16 @@ ipcMain.handle("show-save-dialog", async () => {
   return { canceled: result.canceled, filePath: result.filePath ?? null };
 });
 
-app.whenReady().then(createWindow);
+app.whenReady().then(async () => {
+  createWindow();
+
+  const mcpClient = await connectMcpClient();
+  const { tools } = await mcpClient.listTools();
+  console.log(
+    "[mcp] connected, tools:",
+    tools.map((t) => t.name),
+  );
+});
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
