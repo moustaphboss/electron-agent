@@ -71,12 +71,8 @@ function buildSearchQuery(input: SearchPhotosInput) {
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-  params.limit = input.limit;
 
-  return {
-    sql: `SELECT * FROM photos ${where} ORDER BY captured_at DESC LIMIT @limit`,
-    params,
-  };
+  return { where, params };
 }
 
 server.registerTool(
@@ -87,10 +83,19 @@ server.registerTool(
     inputSchema: searchPhotosInput,
   },
   async (input) => {
-    const { sql, params } = buildSearchQuery(input);
-    const rows = db.prepare(sql).all(params);
+    const { where, params } = buildSearchQuery(input);
+    const totalMatches = (db.prepare(`SELECT COUNT(*) as n FROM photos ${where}`).get(params) as { n: number }).n;
+    const rows = db.prepare(`SELECT * FROM photos ${where} ORDER BY captured_at DESC LIMIT @limit`).all({
+      ...params,
+      limit: input.limit,
+    });
     return {
-      content: [{ type: "text", text: JSON.stringify(rows, null, 2) }],
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ totalMatches, returned: rows.length, truncated: totalMatches > rows.length, photos: rows }, null, 2),
+        },
+      ],
     };
   }
 );
