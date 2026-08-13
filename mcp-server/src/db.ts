@@ -1,7 +1,9 @@
 import Database from "better-sqlite3";
+import { mkdirSync } from "node:fs";
 import path from "node:path";
 
 const dbPath = path.join(import.meta.dirname, "../data/photos.db");
+mkdirSync(path.dirname(dbPath), { recursive: true });
 export const db = new Database(dbPath);
 
 db.exec(`
