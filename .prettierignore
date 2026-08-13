@@ -1,0 +1,7 @@
+node_modules
+out
+dist
+mcp-server/data
+mcp-server/dist
+package-lock.json
+mcp-server/package-lock.json

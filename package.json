@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "tsc -b && electron-vite build",
-    "start": "electron-vite preview"
+    "start": "electron-vite preview",
+    "format": "prettier --write ."
   },
   "keywords": [],
   "author": "",
@@ -20,6 +21,7 @@
     "@vitejs/plugin-react": "^5.2.0",
     "electron": "^43.3.0",
     "electron-vite": "^5.0.0",
+    "prettier": "^3.9.6",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^7.3.6"
