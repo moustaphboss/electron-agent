@@ -92,6 +92,31 @@ server.registerTool(
   }
 );
 
+const getPhotoDetailsInput = {
+  id: z.number().int().positive(),
+};
+
+server.registerTool(
+  "get_photo_details",
+  {
+    title: "Get Photo Details",
+    description: "Fetch the full metadata for a single photo by its id.",
+    inputSchema: getPhotoDetailsInput,
+  },
+  async ({ id }) => {
+    const photo = db.prepare("SELECT * FROM photos WHERE id = @id").get({ id });
+    if (!photo) {
+      return {
+        content: [{ type: "text", text: `No photo found with id ${id}.` }],
+      };
+    }
+    return {
+      content: [{ type: "text", text: JSON.stringify(photo, null, 2) }],
+    };
+  }
+);
+
+
 
 const transport = new StdioServerTransport();
 
