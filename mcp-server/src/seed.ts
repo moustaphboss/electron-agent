@@ -1,9 +1,7 @@
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { db } from "./db.js";
-import exifr from "exifr";
-const { parse: parseExif } = exifr;
-
+import { extractExif } from "./exif.js";
 
 const PHOTOS_ROOT = "/Users/moustaphakebe/Pictures/1 Photography";
 const EXCLUDED_DIRS = new Set(["raw", "smaller", "2025 Recap", "Paddy"]);
@@ -31,24 +29,14 @@ function parseCountryAndCity(filePath: string, root: string): { country: string;
 }
 
 async function extractPhotoData(filePath: string, root: string) {
-  const exif = await parseExif(filePath, {
-    pick: ["Make", "Model", "LensModel", "FNumber", "ExposureTime", "ISO", "FocalLength", "DateTimeOriginal"],
-  });
+  const exif = await extractExif(filePath);
   const { country, city } = parseCountryAndCity(filePath, root);
-
   return {
     file_path: filePath,
     filename: path.basename(filePath),
     country,
     city,
-    camera_make: exif?.Make ?? null,
-    camera_model: exif?.Model ?? null,
-    lens: exif?.LensModel ?? null,
-    aperture: exif?.FNumber ?? null,
-    shutter_speed: exif?.ExposureTime ?? null,
-    iso: exif?.ISO ?? null,
-    focal_length: exif?.FocalLength ?? null,
-    captured_at: exif?.DateTimeOriginal ? exif.DateTimeOriginal.toISOString() : null,
+    ...exif,
   };
 }
 

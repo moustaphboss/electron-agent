@@ -2,6 +2,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { db } from "./db.js";
+import { readdir } from "node:fs/promises";
+import path from "node:path";
+import { extractExif } from "./exif.js";
 
 const server = new McpServer({
   name: "mcp-server",
@@ -116,6 +119,65 @@ server.registerTool(
   }
 );
 
+const suggestPhotoLocationsInput = {
+  folderPath: z.string(),
+};
+
+server.registerTool(
+  "suggest_photo_locations",
+  {
+    title: "Suggest Photo Locations",
+    description:
+      "Given a folder of unsorted photos, suggest which trip (country/city) each one belongs to, by matching its capture date against known trip date ranges.",
+    inputSchema: suggestPhotoLocationsInput,
+  },
+  async ({ folderPath }) => {
+    const cityRanges = db
+      .prepare(
+        `SELECT country, city, MIN(captured_at) as start, MAX(captured_at) as end
+         FROM photos WHERE city IS NOT NULL GROUP BY country, city`
+      )
+      .all() as { country: string; city: string; start: string; end: string }[];
+    const countryRanges = db
+      .prepare(`SELECT country, MIN(captured_at) as start, MAX(captured_at) as end FROM photos GROUP BY country`)
+      .all() as { country: string; start: string; end: string }[];
+
+    const entries = await readdir(folderPath, { withFileTypes: true });
+    const jpgs = entries.filter((e) => e.isFile() && e.name.toLowerCase().endsWith(".jpg"));
+
+    const suggestions = [];
+    for (const file of jpgs) {
+      const exif = await extractExif(path.join(folderPath, file.name));
+      if (!exif.captured_at) {
+        suggestions.push({ filename: file.name, suggestedCountry: null, suggestedCity: null, reason: "No capture date in EXIF." });
+        continue;
+      }
+      const cityMatch = cityRanges.find((r) => exif.captured_at! >= r.start && exif.captured_at! <= r.end);
+      if (cityMatch) {
+        suggestions.push({
+          filename: file.name,
+          suggestedCountry: cityMatch.country,
+          suggestedCity: cityMatch.city,
+          reason: `Captured ${exif.captured_at}, within your ${cityMatch.city}, ${cityMatch.country} trip.`,
+        });
+        continue;
+      }
+      const countryMatch = countryRanges.find((r) => exif.captured_at! >= r.start && exif.captured_at! <= r.end);
+      suggestions.push(
+        countryMatch
+          ? {
+              filename: file.name,
+              suggestedCountry: countryMatch.country,
+              suggestedCity: null,
+              reason: `Captured ${exif.captured_at}, within your ${countryMatch.country} trip.`,
+            }
+          : { filename: file.name, suggestedCountry: null, suggestedCity: null, reason: "Doesn't match any known trip." }
+      );
+    }
+
+    return { content: [{ type: "text", text: JSON.stringify(suggestions, null, 2) }] };
+  }
+);
 
 
 const transport = new StdioServerTransport();
