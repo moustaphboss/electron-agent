@@ -2,7 +2,15 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { db } from "./db.js";
-import { readdir } from "node:fs/promises";
+import {
+  access,
+  copyFile,
+  mkdir,
+  readdir,
+  rename,
+  stat,
+  unlink,
+} from "node:fs/promises";
 import path from "node:path";
 import { extractExif } from "./exif.js";
 
@@ -248,6 +256,21 @@ server.registerTool(
         )
         .all() as { country: string; start: string; end: string }[];
 
+      // City and country ranges compete on equal footing — a country-wide
+      // span (e.g. several separate city trips combined) can be far broader
+      // than a short, distinct trip elsewhere that happens to fall inside
+      // it. Below, whichever matching range is narrowest wins, regardless
+      // of whether it's a city or a country row.
+      const allRanges: {
+        country: string;
+        city: string | null;
+        start: string;
+        end: string;
+      }[] = [
+        ...cityRanges.map((r) => ({ ...r, city: r.city as string | null })),
+        ...countryRanges.map((r) => ({ ...r, city: null })),
+      ];
+
       let entries;
       try {
         entries = await readdir(folderPath, { withFileTypes: true });
@@ -280,40 +303,127 @@ server.registerTool(
           });
           continue;
         }
-        const cityMatch = cityRanges.find(
+        const matches = allRanges.filter(
           (r) => exif.captured_at! >= r.start && exif.captured_at! <= r.end,
         );
-        if (cityMatch) {
+        if (matches.length === 0) {
           suggestions.push({
             filename: file.name,
-            suggestedCountry: cityMatch.country,
-            suggestedCity: cityMatch.city,
-            reason: `Captured ${exif.captured_at}, within your ${cityMatch.city}, ${cityMatch.country} trip.`,
+            suggestedCountry: null,
+            suggestedCity: null,
+            reason: "Doesn't match any known trip.",
           });
           continue;
         }
-        const countryMatch = countryRanges.find(
-          (r) => exif.captured_at! >= r.start && exif.captured_at! <= r.end,
-        );
-        suggestions.push(
-          countryMatch
-            ? {
-                filename: file.name,
-                suggestedCountry: countryMatch.country,
-                suggestedCity: null,
-                reason: `Captured ${exif.captured_at}, within your ${countryMatch.country} trip.`,
-              }
-            : {
-                filename: file.name,
-                suggestedCountry: null,
-                suggestedCity: null,
-                reason: "Doesn't match any known trip.",
-              },
-        );
+        const duration = (r: (typeof matches)[number]) =>
+          new Date(r.end).getTime() - new Date(r.start).getTime();
+        const best = matches.reduce((a, b) => (duration(b) < duration(a) ? b : a));
+        suggestions.push({
+          filename: file.name,
+          suggestedCountry: best.country,
+          suggestedCity: best.city,
+          reason: best.city
+            ? `Captured ${exif.captured_at}, within your ${best.city}, ${best.country} trip.`
+            : `Captured ${exif.captured_at}, within your ${best.country} trip.`,
+        });
       }
 
       return {
         content: [{ type: "text", text: JSON.stringify(suggestions, null, 2) }],
+      };
+    },
+  ),
+);
+
+const movePhotoInput = {
+  sourcePath: z.string(),
+  destinationFolder: z.string(),
+};
+
+server.registerTool(
+  "move_photo",
+  {
+    title: "Move Photo",
+    description:
+      "Move a photo file into a destination folder, creating the folder if it doesn't exist. " +
+      "Never overwrites an existing file — if the destination already has a file with that name, " +
+      "this fails instead of clobbering it, so pick a different destination or ask the user how " +
+      "to resolve the conflict. Only call this when the user has explicitly asked to move, sort, " +
+      "or organize specific files — never automatically after just suggesting where they belong.",
+    inputSchema: movePhotoInput,
+  },
+  withLogging(
+    "move_photo",
+    async ({
+      sourcePath,
+      destinationFolder,
+    }: {
+      sourcePath: string;
+      destinationFolder: string;
+    }) => {
+      let sourceStat;
+      try {
+        sourceStat = await stat(sourcePath);
+      } catch {
+        return {
+          content: [{ type: "text", text: `Source file not found: ${sourcePath}` }],
+          isError: true,
+        };
+      }
+      if (!sourceStat.isFile()) {
+        return {
+          content: [{ type: "text", text: `Not a file: ${sourcePath}` }],
+          isError: true,
+        };
+      }
+
+      const destinationPath = path.join(
+        destinationFolder,
+        path.basename(sourcePath),
+      );
+
+      const alreadyExists = await access(destinationPath)
+        .then(() => true)
+        .catch(() => false);
+      if (alreadyExists) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `A file already exists at ${destinationPath} — refusing to overwrite it. Choose a different destination or ask the user how to resolve the conflict.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        await mkdir(destinationFolder, { recursive: true });
+        await rename(sourcePath, destinationPath);
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code === "EXDEV") {
+          // rename() can't cross filesystem/device boundaries atomically —
+          // fall back to copy-then-delete, which works across devices.
+          await copyFile(sourcePath, destinationPath);
+          await unlink(sourcePath);
+        } else {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Could not move file: ${err instanceof Error ? err.message : String(err)}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
+      return {
+        content: [
+          { type: "text", text: JSON.stringify({ movedTo: destinationPath }) },
+        ],
       };
     },
   ),

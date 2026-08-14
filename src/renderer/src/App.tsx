@@ -391,8 +391,8 @@ function App() {
                 <p
                   className={`max-w-[85%] whitespace-pre-wrap rounded-lg px-3 py-2 text-xs ${
                     m.role === "user"
-                      ? "bg-indigo-600 text-white"
-                      : "bg-slate-800 text-white"
+                      ? "rounded-br-none bg-indigo-600 text-white"
+                      : "rounded-bl-none bg-slate-800 text-white"
                   }`}
                 >
                   {m.content}
@@ -418,7 +418,7 @@ function App() {
             {asking && !isReadOnly && (
               <div className="flex justify-start">
                 <p
-                  className={`max-w-[85%] whitespace-pre-wrap rounded-lg bg-slate-800 px-3 py-2 text-xs ${
+                  className={`max-w-[85%] whitespace-pre-wrap rounded-lg rounded-bl-none bg-slate-800 px-3 py-2 text-xs ${
                     streamingText ? "text-white" : "text-slate-400"
                   }`}
                 >

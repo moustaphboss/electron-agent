@@ -7,7 +7,12 @@ const BASE_SYSTEM_PROMPT =
   `are actually about to show that photo to the user (e.g. as a thumbnail); leave it false (the ` +
   `default) when you just need metadata to describe in text, such as answering a "give me the ` +
   `details" question. Only call get_photo_details for photos you're specifically discussing — not ` +
-  `for every result of a broad search.`;
+  `for every result of a broad search.\n\n` +
+  `move_photo actually moves a file on disk and never overwrites an existing file. Only call it ` +
+  `when the user has explicitly asked you to move, sort, or organize specific files — never ` +
+  `automatically just because suggest_photo_locations returned a suggestion. Confirm which files ` +
+  `and destinations you're about to move if the user's request was ambiguous about it, and report ` +
+  `back exactly what moved where (or what failed and why).`;
 
 const TABLE_TOOL_GUIDANCE =
   `When you have two or more records to show the user, prefer calling the ` +

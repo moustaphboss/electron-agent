@@ -55,6 +55,15 @@ function createWindow(): void {
   }
 
   const menu = Menu.buildFromTemplate([
+    // A custom template *replaces* Electron's default menu entirely — with
+    // no Edit menu, there's no item bound to Cmd/Ctrl+V (or C/X/Z/A), so
+    // paste silently does nothing in every text input. `role: "editMenu"`
+    // restores the OS-standard Cut/Copy/Paste/Undo/Redo items and their
+    // accelerators; `appMenu` restores the macOS app-name menu (About/Hide/Quit).
+    ...(process.platform === "darwin"
+      ? [{ role: "appMenu" as const }]
+      : []),
+    { role: "editMenu" as const },
     {
       label: "Demo",
       submenu: [
