@@ -172,10 +172,6 @@ function App() {
       if (requestId !== activeRequestId.current) return;
       setStreamingText((prev) => prev + delta);
     });
-    window.demoAPI.onAgentReset((requestId) => {
-      if (requestId !== activeRequestId.current) return;
-      setStreamingText("");
-    });
     window.demoAPI.onAgentDone((requestId, reply) => {
       if (requestId !== activeRequestId.current) return;
       activeRequestId.current = null;

@@ -20,28 +20,21 @@ export interface AgentReply {
   ui: UIBlock[];
 }
 
-export interface AgentStreamHandlers {
-  /** Called with each text delta as the model generates it. */
-  onDelta: (text: string) => void;
-  /**
-   * Called when the text streamed so far turns out to be intermediate
-   * reasoning (the turn ended with a tool call, not a final answer) — the
-   * caller should discard whatever it's displayed and start fresh.
-   */
-  onTurnDiscarded: () => void;
-}
-
 export async function runAgentLoop(
   userMessage: string,
   mcpClient: Client,
   anthropic: Anthropic,
-  handlers: AgentStreamHandlers,
+  onDelta: (text: string) => void,
   a2uiEnabled: boolean,
 ): Promise<AgentReply> {
   const traceId = randomUUID();
   console.log(`[agent] turn start, traceId=${traceId}`);
   const images: string[] = [];
   const uiBlocks: UIBlock[] = [];
+  // Every turn's text accumulates here — a turn that also calls a tool isn't
+  // "wrong" reasoning to discard, it's real content the model said on its
+  // way to the answer. What streams live is always exactly the final text.
+  let fullText = "";
 
   const { tools } = await mcpClient.listTools();
   const anthropicTools = tools.map((t) => ({
@@ -65,6 +58,13 @@ export async function runAgentLoop(
   ];
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
+    if (fullText) {
+      // Separate this turn's text from the previous turn's in both the
+      // live stream and the persisted message, so they don't run together.
+      fullText += "\n\n";
+      onDelta("\n\n");
+    }
+
     const stream = anthropic.messages.stream({
       model: MODEL,
       max_tokens: 1024,
@@ -73,7 +73,10 @@ export async function runAgentLoop(
       tools: allTools,
     });
 
-    stream.on("text", (delta) => handlers.onDelta(delta));
+    stream.on("text", (delta) => {
+      fullText += delta;
+      onDelta(delta);
+    });
 
     const response = await stream.finalMessage();
 
@@ -87,16 +90,8 @@ export async function runAgentLoop(
     const toolUseBlocks = response.content.filter((b) => b.type === "tool_use");
 
     if (toolUseBlocks.length === 0) {
-      return {
-        text: reasoning && "text" in reasoning ? reasoning.text : "",
-        images,
-        ui: uiBlocks,
-      };
+      return { text: fullText, images, ui: uiBlocks };
     }
-
-    // The text streamed above (if any) was reasoning ahead of a tool call,
-    // not the final answer — tell the caller to clear it before we go again.
-    handlers.onTurnDiscarded();
 
     // A fresh batch of get_photo_details calls supersedes any earlier batch
     // (the model is re-choosing which photos to show). A round with no

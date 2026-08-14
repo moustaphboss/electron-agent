@@ -36,7 +36,6 @@ export interface DemoAPI {
     a2uiEnabled: boolean,
   ) => void;
   onAgentChunk: (callback: (requestId: string, delta: string) => void) => void;
-  onAgentReset: (callback: (requestId: string) => void) => void;
   onAgentDone: (
     callback: (requestId: string, reply: AgentReply) => void,
   ) => void;

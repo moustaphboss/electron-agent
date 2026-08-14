@@ -25,9 +25,6 @@ contextBridge.exposeInMainWorld("demoAPI", {
       callback(requestId, delta),
     );
   },
-  onAgentReset: (callback: (requestId: string) => void) => {
-    ipcRenderer.on("agent-reset", (_e, requestId) => callback(requestId));
-  },
   onAgentDone: (
     callback: (
       requestId: string,

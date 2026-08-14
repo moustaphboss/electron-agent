@@ -125,10 +125,7 @@ ipcMain.on(
               message,
               mcpClient,
               anthropic,
-              {
-                onDelta: (delta) => sender.send("agent-chunk", requestId, delta),
-                onTurnDiscarded: () => sender.send("agent-reset", requestId),
-              },
+              (delta) => sender.send("agent-chunk", requestId, delta),
               a2uiEnabled,
             );
       sender.send("agent-done", requestId, reply);
