@@ -4,7 +4,11 @@ import path from "node:path";
 const APP_DIR = path.resolve(__dirname, "..");
 
 test("asking for a specific photo renders its image end-to-end", async () => {
-  const env = { ...process.env };
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(
+      (entry): entry is [string, string] => entry[1] !== undefined,
+    ),
+  );
   delete env.ELECTRON_RUN_AS_NODE;
 
   const app = await electron.launch({ args: [APP_DIR], env });

@@ -178,6 +178,13 @@ server.registerTool(
 
 const getPhotoDetailsInput = {
   id: z.number().int().positive(),
+  includeImage: z
+    .boolean()
+    .default(false)
+    .describe(
+      "Set true only when actually displaying this photo to the user (e.g. as a thumbnail). " +
+        "Leave false when you just need metadata to describe in text.",
+    ),
 };
 
 server.registerTool(
@@ -187,17 +194,26 @@ server.registerTool(
     description: "Fetch the full metadata for a single photo by its id.",
     inputSchema: getPhotoDetailsInput,
   },
-  withLogging("get_photo_details", async ({ id }: { id: number }) => {
-    const photo = db.prepare("SELECT * FROM photos WHERE id = @id").get({ id });
-    if (!photo) {
+  withLogging(
+    "get_photo_details",
+    async ({ id, includeImage }: { id: number; includeImage: boolean }) => {
+      const photo = db
+        .prepare("SELECT * FROM photos WHERE id = @id")
+        .get({ id }) as Record<string, unknown> | undefined;
+      if (!photo) {
+        return {
+          content: [{ type: "text", text: `No photo found with id ${id}.` }],
+        };
+      }
+      // Same principle as search_photos: file_path only goes to the model
+      // when it explicitly asked for it, not just because it looked up the id.
+      const { file_path, ...rest } = photo;
+      const responsePhoto = includeImage ? photo : rest;
       return {
-        content: [{ type: "text", text: `No photo found with id ${id}.` }],
+        content: [{ type: "text", text: JSON.stringify(responsePhoto, null, 2) }],
       };
-    }
-    return {
-      content: [{ type: "text", text: JSON.stringify(photo, null, 2) }],
-    };
-  }),
+    },
+  ),
 );
 
 const suggestPhotoLocationsInput = {

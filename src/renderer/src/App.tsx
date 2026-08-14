@@ -52,6 +52,26 @@ function UITableBlock({ block }: { block: Extract<UIBlock, { type: "table" }> })
   );
 }
 
+function ThinkingIndicator() {
+  return (
+    <span className="inline-flex items-center gap-1 text-slate-400">
+      Thinking
+      <span className="inline-flex gap-0.5">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="h-1 w-1 rounded-full bg-slate-400"
+            style={{
+              animation: "thinking-dot 1.4s ease-in-out infinite",
+              animationDelay: `${i * 0.2}s`,
+            }}
+          />
+        ))}
+      </span>
+    </span>
+  );
+}
+
 function App() {
   const [pingResult, setPingResult] = useState<PingResult | null>(null);
   const [pinging, setPinging] = useState(false);
@@ -406,7 +426,7 @@ function App() {
                     streamingText ? "text-white" : "text-slate-400"
                   }`}
                 >
-                  {streamingText || "Thinking…"}
+                  {streamingText || <ThinkingIndicator />}
                 </p>
               </div>
             )}
