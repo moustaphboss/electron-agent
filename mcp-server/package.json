@@ -7,6 +7,7 @@
     "build": "tsc -b",
     "seed": "tsc -b && node dist/seed.js",
     "seed:ci": "tsc -b && node dist/seed-ci.js",
+    "index-embeddings": "tsc -b && node dist/indexEmbeddings.js",
     "start": "node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -15,8 +16,11 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.116.0",
+    "@huggingface/transformers": "^4.2.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "better-sqlite3": "^13.0.3",
+    "dotenv": "^17.4.2",
     "exifr": "^7.1.3",
     "zod": "^4.4.3"
   },

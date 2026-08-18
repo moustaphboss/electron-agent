@@ -23,3 +23,13 @@ db.exec(`
     captured_at TEXT
   )
 `);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS photo_embeddings (
+    photo_id INTEGER PRIMARY KEY REFERENCES photos(id),
+    caption TEXT NOT NULL,
+    embedding BLOB NOT NULL,
+    model TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )
+`);
