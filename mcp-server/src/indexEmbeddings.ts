@@ -1,8 +1,8 @@
-import { readFileSync } from "node:fs";
 import path from "node:path";
 import { config } from "dotenv";
 import Anthropic from "@anthropic-ai/sdk";
 import { pipeline } from "@huggingface/transformers";
+import sharp from "sharp";
 import { db } from "./db.js";
 
 // mcp-server/dist/indexEmbeddings.js -> repo root .env is two levels up
@@ -12,14 +12,23 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const CAPTION_MODEL = "claude-sonnet-5";
 const EMBEDDING_MODEL = "Xenova/all-MiniLM-L6-v2";
 const CONCURRENCY = 5;
+// Anthropic's vision endpoint caps images at 10MB base64 and resizes anything
+// above ~1568px on the long edge server-side anyway, so downscaling to that
+// before sending is free — same caption quality, no risk of the raw camera
+// JPEG (often 15-25MB) blowing the size limit.
+const MAX_EDGE_PX = 1568;
 
 const CAPTION_PROMPT = `Describe this photograph in 2-3 sentences for a visual search index. Focus only on what's visually present: the scene and setting, main subjects, lighting and mood, and dominant colors or textures. Do not mention camera settings, location names, or dates — those are tracked separately. Avoid generic praise words like "beautiful" or "stunning"; describe concretely what makes the scene visually distinct, as if describing it to someone who can't see it.`;
 
 async function captionPhoto(filePath: string): Promise<string> {
-  const base64 = readFileSync(filePath).toString("base64");
+  const resized = await sharp(filePath)
+    .resize({ width: MAX_EDGE_PX, height: MAX_EDGE_PX, fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 85 })
+    .toBuffer();
+  const base64 = resized.toString("base64");
   const message = await anthropic.messages.create({
     model: CAPTION_MODEL,
-    max_tokens: 200,
+    max_tokens: 350,
     messages: [
       {
         role: "user",
