@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/* Brand gradient, sampled from the app icon: deep navy -> blue -> cyan -> indigo -> purple */
+@theme {
+  --color-brand-navy: #0d1845;
+  --color-brand-blue: #235883;
+  --color-brand-cyan: #3fa8d2;
+  --color-brand-indigo: #5e6fba;
+  --color-brand-purple: #7b43ac;
+}
+
 @keyframes thinking-dot {
   0%,
   80%,

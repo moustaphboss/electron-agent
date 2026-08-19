@@ -7,7 +7,6 @@ type PingResult = {
   message: string;
   timestamp: number;
 };
-type SaveResult = { canceled: boolean; filePath: string | null };
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
@@ -75,8 +74,6 @@ function ThinkingIndicator() {
 function App() {
   const [pingResult, setPingResult] = useState<PingResult | null>(null);
   const [pinging, setPinging] = useState(false);
-  const [saveResult, setSaveResult] = useState<SaveResult | null>(null);
-  const [saving, setSaving] = useState(false);
 
   const [agentMessage, setAgentMessage] = useState("");
   const [currentMessages, setCurrentMessages] = useState<ChatMessage[]>([]);
@@ -108,16 +105,6 @@ function App() {
       setPingResult({ source, ...result });
     } finally {
       setPinging(false);
-    }
-  }
-
-  async function runSaveDialog() {
-    setSaving(true);
-    try {
-      const result = await window.demoAPI.showSaveDialog();
-      setSaveResult(result);
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -224,9 +211,9 @@ function App() {
   }, []);
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-100">
+    <div className="flex h-screen bg-linear-to-br from-brand-navy via-slate-950 to-brand-navy text-slate-100">
       {/* Sidebar */}
-      <aside className="flex w-64 shrink-0 flex-col border-r border-slate-800 bg-slate-900 p-4">
+      <aside className="flex w-64 shrink-0 flex-col border-r border-white/10 bg-slate-950/40 p-4 backdrop-blur-xl">
         <div className="flex items-center gap-2">
           <img src={iconUrl} alt="" className="h-6 w-6 rounded" />
           <h1 className="text-lg font-semibold tracking-tight">Mustipix</h1>
@@ -288,44 +275,7 @@ function App() {
 
       {/* Main content */}
       <main className="flex flex-1 flex-col overflow-y-auto p-8">
-        <p className="text-sm text-slate-400">
-          Renderer <span className="text-slate-500">↔</span> Main process, over
-          IPC.
-        </p>
-
-        <div className="mt-4 flex flex-wrap gap-3">
-          <button
-            id="ping-btn"
-            onClick={() => runPing("button")}
-            disabled={pinging}
-            className="cursor-pointer rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {pinging ? "Pinging…" : "Ping Main Process"}
-          </button>
-          <button
-            id="save-btn"
-            onClick={runSaveDialog}
-            disabled={saving}
-            className="cursor-pointer rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {saving ? "Waiting for dialog…" : "Save File Dialog"}
-          </button>
-        </div>
-
-        <div className="mt-4 space-y-2 font-mono text-xs">
-          <p id="ping-result" className="min-h-[1.25rem] text-emerald-400">
-            {pingResult &&
-              `[${pingResult.source}] ${pingResult.message} @ ${pingResult.timestamp}`}
-          </p>
-          <p id="save-result" className="min-h-[1.25rem] text-sky-400">
-            {saveResult &&
-              (saveResult.canceled
-                ? "Save dialog canceled"
-                : `Saved to: ${saveResult.filePath}`)}
-          </p>
-        </div>
-
-        <div className="mt-8 flex flex-1 flex-col border-t border-slate-800 pt-6">
+        <div className="flex flex-1 flex-col">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-slate-200">
               Ask Agent (photo library)
