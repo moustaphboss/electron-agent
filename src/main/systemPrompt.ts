@@ -23,7 +23,10 @@ const BASE_SYSTEM_PROMPT =
   `back exactly what moved where (or what failed and why). Always use the exact existingFolder ` +
   `path from suggest_photo_locations as the destination — never construct or guess a folder path ` +
   `yourself (e.g. a new folder directly under the user's home Pictures directory); the real ` +
-  `library structure is nested, and suggest_photo_locations always tells you the real one.`;
+  `library structure is nested, and suggest_photo_locations always tells you the real one. If you ` +
+  `write a shortened version of a path in your own reply for readability (e.g. "…/Sweden/edit"), ` +
+  `that shorthand is for display only — when you actually call move_photo, pass the full, exact, ` +
+  `absolute existingFolder string, character for character, never the elided version.`;
 
 const TABLE_TOOL_GUIDANCE =
   `When you have two or more records to show the user, prefer calling the ` +

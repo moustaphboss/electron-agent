@@ -390,6 +390,24 @@ server.registerTool(
       sourcePath: string;
       destinationFolder: string;
     }) => {
+      // Guards against the model reusing an elided display path (e.g. a
+      // "…/Sweden/edit" shorthand it wrote in its own prose) as the literal
+      // argument here. A relative path wouldn't fail — it would silently
+      // resolve against this process's cwd and move the file somewhere
+      // unintended, which is a much worse outcome than a rejected call for
+      // an operation that actually touches disk.
+      if (!path.isAbsolute(destinationFolder)) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `destinationFolder must be an absolute path, got: ${destinationFolder}. Use the exact existingFolder value from suggest_photo_locations, in full — never an abbreviated or elided version of it.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
       let sourceStat;
       try {
         sourceStat = await stat(sourcePath);
