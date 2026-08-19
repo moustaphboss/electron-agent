@@ -124,6 +124,12 @@ function App() {
   function runAskAgent() {
     if (!agentMessage.trim() || isReadOnly) return;
     const userText = agentMessage;
+    // Snapshot before the new user message is appended — this is everything
+    // the model should already know about going into this turn.
+    const history = currentMessages.map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
     setCurrentMessages((prev) => [
       ...prev,
       { role: "user", content: userText },
@@ -133,7 +139,13 @@ function App() {
     setAsking(true);
     const requestId = crypto.randomUUID();
     activeRequestId.current = requestId;
-    window.demoAPI.askAgentStream(requestId, userText, agentMode, a2uiEnabled);
+    window.demoAPI.askAgentStream(
+      requestId,
+      userText,
+      agentMode,
+      a2uiEnabled,
+      history,
+    );
   }
 
   function startNewChat() {

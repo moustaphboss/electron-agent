@@ -5,7 +5,7 @@ import { tool } from "@langchain/core/tools";
 import { AIMessageChunk, isToolMessage } from "@langchain/core/messages";
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { extractImagePaths } from "./extractImages";
-import type { AgentReply } from "./agentLoop";
+import type { AgentReply, ChatHistoryEntry } from "./agentLoop";
 import {
   RENDER_TABLE_JSON_SCHEMA,
   RENDER_TABLE_TOOL_DESCRIPTION,
@@ -39,6 +39,7 @@ export async function runLangGraphAgentLoop(
   mcpClient: Client,
   onDelta: (text: string) => void,
   a2uiEnabled: boolean,
+  history: ChatHistoryEntry[] = [],
 ): Promise<AgentReply> {
   const tools = await loadMcpTools("mcp-server", mcpClient);
 
@@ -71,7 +72,14 @@ export async function runLangGraphAgentLoop(
   });
 
   const stream = await agent.stream(
-    { messages: [{ role: "user", content: userMessage }] },
+    {
+      messages: [
+        ...history
+          .filter((h) => h.content.trim().length > 0)
+          .map((h) => ({ role: h.role, content: h.content })),
+        { role: "user", content: userMessage },
+      ],
+    },
     // `runName` labels the trace in LangSmith (see LANGSMITH_TRACING in
     // .env) so it's identifiable at a glance in the project dashboard.
     { streamMode: "messages", runName: "mustipix-ask-agent" },

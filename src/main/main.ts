@@ -7,7 +7,7 @@ import { readFile } from "fs/promises";
 import Anthropic from "@anthropic-ai/sdk";
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { connectMcpClient } from "./mcpClient";
-import { runAgentLoop } from "./agentLoop";
+import { runAgentLoop, type ChatHistoryEntry } from "./agentLoop";
 import { runLangGraphAgentLoop } from "./langGraphAgentLoop";
 
 export type AgentMode = "hand-rolled" | "langgraph";
@@ -115,6 +115,7 @@ ipcMain.on(
     message: string,
     mode: AgentMode = "hand-rolled",
     a2uiEnabled = true,
+    history: ChatHistoryEntry[] = [],
   ) => {
     const sender = event.sender;
     if (!mcpClient) {
@@ -129,6 +130,7 @@ ipcMain.on(
               mcpClient,
               (delta) => sender.send("agent-chunk", requestId, delta),
               a2uiEnabled,
+              history,
             )
           : await runAgentLoop(
               message,
@@ -136,6 +138,7 @@ ipcMain.on(
               anthropic,
               (delta) => sender.send("agent-chunk", requestId, delta),
               a2uiEnabled,
+              history,
             );
       sender.send("agent-done", requestId, reply);
     } catch (err) {

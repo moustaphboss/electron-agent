@@ -20,12 +20,25 @@ export interface AgentReply {
   ui: UIBlock[];
 }
 
+/**
+ * A prior turn's plain-text content, as already shown in the UI — not the
+ * raw tool_use/tool_result trace. The Messages API is stateless, so every
+ * call has to resend everything the model should remember; this is the
+ * simplest thing that's true to resend, since it's exactly what the model
+ * itself said (or was asked) in earlier turns.
+ */
+export interface ChatHistoryEntry {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export async function runAgentLoop(
   userMessage: string,
   mcpClient: Client,
   anthropic: Anthropic,
   onDelta: (text: string) => void,
   a2uiEnabled: boolean,
+  history: ChatHistoryEntry[] = [],
 ): Promise<AgentReply> {
   const traceId = randomUUID();
   console.log(`[agent] turn start, traceId=${traceId}`);
@@ -54,6 +67,9 @@ export async function runAgentLoop(
     : anthropicTools;
 
   const messages: Anthropic.MessageParam[] = [
+    ...history
+      .filter((h) => h.content.trim().length > 0)
+      .map((h) => ({ role: h.role, content: h.content })),
     { role: "user", content: userMessage },
   ];
 

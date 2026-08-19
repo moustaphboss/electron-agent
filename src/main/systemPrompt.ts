@@ -12,7 +12,10 @@ const BASE_SYSTEM_PROMPT =
   `when the user has explicitly asked you to move, sort, or organize specific files — never ` +
   `automatically just because suggest_photo_locations returned a suggestion. Confirm which files ` +
   `and destinations you're about to move if the user's request was ambiguous about it, and report ` +
-  `back exactly what moved where (or what failed and why).`;
+  `back exactly what moved where (or what failed and why). Always use the exact existingFolder ` +
+  `path from suggest_photo_locations as the destination — never construct or guess a folder path ` +
+  `yourself (e.g. a new folder directly under the user's home Pictures directory); the real ` +
+  `library structure is nested, and suggest_photo_locations always tells you the real one.`;
 
 const TABLE_TOOL_GUIDANCE =
   `When you have two or more records to show the user, prefer calling the ` +

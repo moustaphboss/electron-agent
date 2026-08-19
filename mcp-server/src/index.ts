@@ -233,7 +233,12 @@ server.registerTool(
   {
     title: "Suggest Photo Locations",
     description:
-      "Given a folder of unsorted photos, suggest which trip (country/city) each one belongs to, by matching its capture date against known trip date ranges.",
+      "Given a folder of unsorted photos, suggest which trip (country/city) each one belongs to, " +
+      "by matching its capture date against known trip date ranges. Each suggestion's " +
+      "existingFolder is the real, already-existing folder that trip's other photos are filed " +
+      "under — pass it verbatim as move_photo's destinationFolder. Never construct a destination " +
+      "path yourself (e.g. a new folder directly under the user's Pictures directory); this tool " +
+      "always tells you the real one.",
     inputSchema: suggestPhotoLocationsInput,
   },
   withLogging(
@@ -244,12 +249,7 @@ server.registerTool(
           `SELECT country, city, MIN(captured_at) as start, MAX(captured_at) as end
          FROM photos WHERE city IS NOT NULL GROUP BY country, city`,
         )
-        .all() as {
-        country: string;
-        city: string;
-        start: string;
-        end: string;
-      }[];
+        .all() as { country: string; city: string; start: string; end: string }[];
       const countryRanges = db
         .prepare(
           `SELECT country, MIN(captured_at) as start, MAX(captured_at) as end FROM photos GROUP BY country`,
@@ -270,6 +270,25 @@ server.registerTool(
         ...cityRanges.map((r) => ({ ...r, city: r.city as string | null })),
         ...countryRanges.map((r) => ({ ...r, city: null })),
       ];
+
+      // Maps "country::city" to the real, already-cataloged folder photos
+      // for that trip are filed under, so move_photo's destination can be
+      // derived instead of guessed. Photos for the same (country, city)
+      // aren't always in one flat folder — some trips are entirely under a
+      // subfolder like "edit" — so this picks whichever cataloged photo has
+      // the *shallowest* path (fewest folder segments), which is always the
+      // real trip folder itself rather than one of its subfolders.
+      const depth = (p: string) => p.split(path.sep).length;
+      const canonicalFolderFor = new Map<string, string>();
+      for (const { country, city, file_path } of db
+        .prepare(`SELECT country, city, file_path FROM photos`)
+        .all() as { country: string; city: string | null; file_path: string }[]) {
+        const key = `${country}::${city ?? ""}`;
+        const existing = canonicalFolderFor.get(key);
+        if (!existing || depth(file_path) < depth(existing)) {
+          canonicalFolderFor.set(key, file_path);
+        }
+      }
 
       let entries;
       try {
@@ -318,13 +337,21 @@ server.registerTool(
         const duration = (r: (typeof matches)[number]) =>
           new Date(r.end).getTime() - new Date(r.start).getTime();
         const best = matches.reduce((a, b) => (duration(b) < duration(a) ? b : a));
+        const canonicalPath = canonicalFolderFor.get(
+          `${best.country}::${best.city ?? ""}`,
+        );
+        const existingFolder = canonicalPath ? path.dirname(canonicalPath) : null;
         suggestions.push({
           filename: file.name,
           suggestedCountry: best.country,
           suggestedCity: best.city,
+          // The real, already-existing folder this photo's trip is filed
+          // under — derived from an actual cataloged photo, not guessed.
+          // Use this exact path as move_photo's destinationFolder.
+          existingFolder,
           reason: best.city
-            ? `Captured ${exif.captured_at}, within your ${best.city}, ${best.country} trip.`
-            : `Captured ${exif.captured_at}, within your ${best.country} trip.`,
+            ? `Captured ${exif.captured_at}, within your ${best.city}, ${best.country} trip (existing folder: ${existingFolder}).`
+            : `Captured ${exif.captured_at}, within your ${best.country} trip (existing folder: ${existingFolder}).`,
         });
       }
 

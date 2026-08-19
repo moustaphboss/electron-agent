@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { UIBlock } from "../main/uiBlocks";
+import type { ChatHistoryEntry } from "../main/agentLoop";
 
 contextBridge.exposeInMainWorld("demoAPI", {
   ping: () => ipcRenderer.invoke("ping"),
@@ -12,6 +13,7 @@ contextBridge.exposeInMainWorld("demoAPI", {
     message: string,
     mode: "hand-rolled" | "langgraph",
     a2uiEnabled: boolean,
+    history: ChatHistoryEntry[],
   ) =>
     ipcRenderer.send(
       "ask-agent-stream",
@@ -19,6 +21,7 @@ contextBridge.exposeInMainWorld("demoAPI", {
       message,
       mode,
       a2uiEnabled,
+      history,
     ),
   onAgentChunk: (callback: (requestId: string, delta: string) => void) => {
     ipcRenderer.on("agent-chunk", (_e, requestId, delta) =>

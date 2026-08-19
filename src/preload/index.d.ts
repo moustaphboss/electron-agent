@@ -25,6 +25,11 @@ export interface AgentReply {
   ui: UIBlock[];
 }
 
+export interface ChatHistoryEntry {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export interface DemoAPI {
   ping: () => Promise<{ message: string; timestamp: number }>;
   showSaveDialog: () => Promise<{ canceled: boolean; filePath: string | null }>;
@@ -34,6 +39,7 @@ export interface DemoAPI {
     message: string,
     mode: "hand-rolled" | "langgraph",
     a2uiEnabled: boolean,
+    history: ChatHistoryEntry[],
   ) => void;
   onAgentChunk: (callback: (requestId: string, delta: string) => void) => void;
   onAgentDone: (
