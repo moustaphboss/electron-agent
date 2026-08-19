@@ -83,7 +83,13 @@ export async function runAgentLoop(
 
     const stream = anthropic.messages.stream({
       model: MODEL,
-      max_tokens: 1024,
+      // Generous enough for a render_table call at its own documented cap
+      // (MAX_TABLE_ROWS=50 x MAX_TABLE_COLUMNS=8) plus reasoning text. At
+      // 1024 a large-but-valid table response could be truncated mid-JSON,
+      // dropping `rows` entirely — validateTableBlock correctly rejects
+      // that, but the model has no way to know *why*, so it just retries
+      // the same call and hits the same wall every turn until MAX_TURNS.
+      max_tokens: 4096,
       system: buildSystemPrompt(a2uiEnabled),
       messages,
       tools: allTools,
