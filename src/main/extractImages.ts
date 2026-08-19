@@ -19,6 +19,14 @@ export function extractImagePaths(
     ) {
       return [parsed.file_path];
     }
+    if (
+      toolName === "search_photos_by_description" &&
+      Array.isArray(parsed?.results)
+    ) {
+      return parsed.results
+        .map((r: unknown) => (r as { file_path?: unknown })?.file_path)
+        .filter((p: unknown): p is string => typeof p === "string");
+    }
   } catch {
     // Not JSON (e.g. "No photo found with id X.") — nothing to extract.
   }

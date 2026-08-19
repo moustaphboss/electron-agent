@@ -81,4 +81,18 @@ export const cases: EvalCase[] = [
       return null;
     },
   },
+  {
+    name: "vibe query picks semantic search, not structured filters",
+    query: "find me some moody, foggy-looking photos",
+    check(result) {
+      const call = lastCallTo(result.toolCalls, "search_photos_by_description");
+      if (!call) {
+        return "expected a search_photos_by_description call, got none";
+      }
+      if (typeof call.input.query !== "string" || !call.input.query.trim()) {
+        return `expected a non-empty query string, got ${JSON.stringify(call.input.query)}`;
+      }
+      return null;
+    },
+  },
 ];

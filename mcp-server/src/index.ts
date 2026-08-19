@@ -13,6 +13,8 @@ import {
 } from "node:fs/promises";
 import path from "node:path";
 import { extractExif } from "./exif.js";
+import { pipeline, type FeatureExtractionPipeline } from "@huggingface/transformers";
+import { cosineSimilarity, bufferToFloat32Array } from "./similarity.js";
 
 const server = new McpServer({
   name: "mcp-server",
@@ -451,6 +453,75 @@ server.registerTool(
         content: [
           { type: "text", text: JSON.stringify({ movedTo: destinationPath }) },
         ],
+      };
+    },
+  ),
+);
+
+const EMBEDDING_MODEL = "Xenova/all-MiniLM-L6-v2";
+
+// Loaded once and reused across calls — this is a long-running server
+// process, not a one-shot script, so there's no reason to re-load the
+// ~90MB model on every tool call the way indexEmbeddings.ts loads it once
+// per run.
+let embedderPromise: Promise<FeatureExtractionPipeline> | null = null;
+function getEmbedder(): Promise<FeatureExtractionPipeline> {
+  if (!embedderPromise) {
+    embedderPromise = pipeline("feature-extraction", EMBEDDING_MODEL);
+  }
+  return embedderPromise;
+}
+
+const searchPhotosByDescriptionInput = {
+  query: z.string().describe("A description of the visual content to search for, e.g. 'foggy mountain lake' or 'street photography at night'."),
+  top_k: z.number().int().positive().max(20).default(5),
+};
+
+server.registerTool(
+  "search_photos_by_description",
+  {
+    title: "Search Photos by Description",
+    description:
+      "Semantic search over what's actually visible in each photo — subject matter, scene, " +
+      "mood, lighting, colors — as opposed to search_photos, which only filters on structured " +
+      "metadata (country, city, exposure, date). Use this for content/vibe queries like 'moody " +
+      "photos with fog' or 'street portraits at night'; use search_photos for date/location/" +
+      "exposure filters. Unlike search_photos, this returns file_path directly since results are " +
+      "already capped to a small top_k of the most relevant matches.",
+    inputSchema: searchPhotosByDescriptionInput,
+  },
+  withLogging(
+    "search_photos_by_description",
+    async ({ query, top_k }: { query: string; top_k: number }) => {
+      const embedder = await getEmbedder();
+      const output = await embedder(query, { pooling: "mean", normalize: true });
+      const queryVector = Float32Array.from(output.data as Float32Array);
+
+      const rows = db
+        .prepare(
+          `SELECT p.id, p.file_path, e.caption, e.embedding
+           FROM photo_embeddings e JOIN photos p ON p.id = e.photo_id
+           WHERE e.model = @model`,
+        )
+        .all({ model: EMBEDDING_MODEL }) as {
+        id: number;
+        file_path: string;
+        caption: string;
+        embedding: Buffer;
+      }[];
+
+      const scored = rows
+        .map((row) => ({
+          id: row.id,
+          file_path: row.file_path,
+          caption: row.caption,
+          score: cosineSimilarity(queryVector, bufferToFloat32Array(row.embedding)),
+        }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, top_k);
+
+      return {
+        content: [{ type: "text", text: JSON.stringify({ results: scored }, null, 2) }],
       };
     },
   ),

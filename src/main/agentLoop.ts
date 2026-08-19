@@ -109,11 +109,19 @@ export async function runAgentLoop(
       return { text: fullText, images, ui: uiBlocks };
     }
 
-    // A fresh batch of get_photo_details calls supersedes any earlier batch
-    // (the model is re-choosing which photos to show). A round with no
-    // get_photo_details call — e.g. just render_table — isn't reselecting
-    // photos, so it must not wipe out images gathered in an earlier round.
-    if (toolUseBlocks.some((b) => b.name === "get_photo_details")) {
+    // A fresh batch of get_photo_details or search_photos_by_description
+    // calls supersedes any earlier batch (the model is re-choosing which
+    // photos to show) — both are the tools that directly contribute file
+    // paths to `images`. A round with neither — e.g. just render_table —
+    // isn't reselecting photos, so it must not wipe out images gathered in
+    // an earlier round.
+    if (
+      toolUseBlocks.some(
+        (b) =>
+          b.name === "get_photo_details" ||
+          b.name === "search_photos_by_description",
+      )
+    ) {
       images.length = 0;
     }
     uiBlocks.length = 0;

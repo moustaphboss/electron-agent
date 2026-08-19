@@ -90,10 +90,12 @@ export async function runLangGraphAgentLoop(
   // Tracks whether the previous stream item was part of an AI turn, so we
   // can tell when a fresh batch of tool calls starts.
   let lastWasAi = false;
-  // Set on every AI turn; consumed by the first get_photo_details call that
-  // follows it. Only a fresh get_photo_details batch supersedes the earlier
-  // photo selection — a render_table (or any other) call isn't reselecting
-  // which photos to show, so it must not wipe `images` out.
+  // Set on every AI turn; consumed by the first get_photo_details or
+  // search_photos_by_description call that follows it — both are the tools
+  // that directly contribute file paths to `images`. Only a fresh batch of
+  // one of those supersedes the earlier photo selection — a render_table
+  // (or any other) call isn't reselecting which photos to show, so it must
+  // not wipe `images` out.
   let awaitingFreshPhotoSelection = true;
 
   for await (const [message] of stream) {
@@ -114,7 +116,11 @@ export async function runLangGraphAgentLoop(
         uiBlocks.length = 0;
       }
       lastWasAi = false;
-      if (message.name === "get_photo_details" && awaitingFreshPhotoSelection) {
+      if (
+        (message.name === "get_photo_details" ||
+          message.name === "search_photos_by_description") &&
+        awaitingFreshPhotoSelection
+      ) {
         images.length = 0;
         awaitingFreshPhotoSelection = false;
       }
